@@ -1,16 +1,18 @@
 /* ===================================================================
    Actualiza results.json desde API-Football (api-sports.io).
-   - Liga 1 (FIFA World Cup), temporada 2026.
+   - Consulta por FECHA (ayer y hoy), no por temporada: el plan Free
+     permite fechas entre hoy-1 y hoy+1, pero NO la temporada 2026.
+   - Filtra la competición World Cup (league id 1).
    - La API key se lee de la variable de entorno API_FOOTBALL_KEY
      (un secreto de GitHub Actions). NUNCA se escribe en el repo.
-   - Mapea cada partido a NUESTRO número (1-104) y orienta el marcador.
+   - Mapea cada partido a NUESTRO número (1-104), orienta el marcador
+     y ACUMULA los resultados en results.json (no borra días previos).
    =================================================================== */
 const fs = require("fs");
 
 const API_KEY = process.env.API_FOOTBALL_KEY;
 const HOST = "https://v3.football.api-sports.io";
 const LEAGUE = 1;      // FIFA World Cup
-const SEASON = 2026;
 
 /* ---- cargar nuestro fixture (data.js define window.WC) ---- */
 global.window = {};
@@ -53,26 +55,55 @@ function mapStatus(short) {
   return null; // NS, TBD, PST, CANC... -> no empezado
 }
 
-async function fetchAllFixtures() {
-  let page = 1, total = 1, all = [];
-  while (page <= total) {
-    const res = await fetch(`${HOST}/fixtures?league=${LEAGUE}&season=${SEASON}&page=${page}`, {
-      headers: { "x-apisports-key": API_KEY }
-    });
-    if (!res.ok) { console.error("❌ HTTP", res.status, await res.text()); process.exit(1); }
-    const data = await res.json();
-    if (data.errors && Object.keys(data.errors).length) {
-      console.error("❌ La API devolvió errores:", JSON.stringify(data.errors));
-      process.exit(1);
-    }
-    all = all.concat(data.response || []);
-    total = data.paging?.total || 1;
-    page++;
-  }
-  return all;
+/* Fecha UTC con desplazamiento de días, en formato YYYY-MM-DD. */
+function utcDate(offsetDays) {
+  return new Date(Date.now() + offsetDays * 86400000).toISOString().slice(0, 10);
 }
 
-/* Convierte la lista de fixtures de la API en nuestro results.json. */
+/* Devuelve los fixtures del Mundial para una fecha, o null si hay que
+   omitir esta ejecución (límite de peticiones alcanzado). */
+async function fetchByDate(date) {
+  const res = await fetch(`${HOST}/fixtures?league=${LEAGUE}&date=${date}`, {
+    headers: { "x-apisports-key": API_KEY }
+  });
+  if (res.status === 429) { console.warn("⏳ Límite diario de peticiones alcanzado; se omite esta ejecución."); return null; }
+  if (!res.ok) { console.error("❌ HTTP", res.status, await res.text()); process.exit(1); }
+  const data = await res.json();
+  if (data.errors && Object.keys(data.errors).length) {
+    console.warn("⚠️ La API devolvió 'errors':", JSON.stringify(data.errors));
+    const txt = JSON.stringify(data.errors).toLowerCase();
+    if (txt.includes("rate") || txt.includes("request") || txt.includes("limit")) return null; // omitir
+  }
+  return (data.response || []).filter(fx => fx.league?.id === LEAGUE);
+}
+
+async function run() {
+  if (!API_KEY) { console.error("❌ Falta el secreto API_FOOTBALL_KEY"); process.exit(1); }
+
+  // Cargar lo que ya había para acumular (no perder días anteriores)
+  let merged = {};
+  try { merged = JSON.parse(fs.readFileSync("results.json", "utf8")) || {}; } catch (e) { merged = {}; }
+
+  // Plan Free: solo se permiten fechas hoy-1 .. hoy+1. Pedimos hoy y ayer.
+  const fixtures = [];
+  for (const d of [utcDate(0), utcDate(-1)]) {
+    const list = await fetchByDate(d);
+    if (list === null) { console.log("Se omite y se conserva lo ya guardado."); break; }
+    console.log(`Fecha ${d}: ${list.length} partidos del Mundial.`);
+    fixtures.push(...list);
+  }
+
+  const fresh = buildResults(fixtures);
+  Object.assign(merged, fresh);                // acumula/actualiza
+  fs.writeFileSync("results.json", JSON.stringify(merged, null, 2) + "\n");
+  console.log(`✅ results.json: ${Object.keys(merged).length} partidos en total.`);
+}
+
+if (require.main === module) {
+  run().catch(e => { console.error(e); process.exit(1); });
+}
+module.exports = { buildResults, run };
+
 function buildResults(fixtures) {
   const out = {};
   let mapped = 0, skipped = 0;
@@ -108,17 +139,3 @@ function buildResults(fixtures) {
   console.log(`Mapeados: ${mapped} | Omitidos: ${skipped}`);
   return out;
 }
-
-async function run() {
-  if (!API_KEY) { console.error("❌ Falta el secreto API_FOOTBALL_KEY"); process.exit(1); }
-  const fixtures = await fetchAllFixtures();
-  console.log("Fixtures recibidos:", fixtures.length);
-  const out = buildResults(fixtures);
-  fs.writeFileSync("results.json", JSON.stringify(out, null, 2) + "\n");
-  console.log(`✅ results.json actualizado con ${Object.keys(out).length} partidos.`);
-}
-
-if (require.main === module) {
-  run().catch(e => { console.error(e); process.exit(1); });
-}
-module.exports = { buildResults };
