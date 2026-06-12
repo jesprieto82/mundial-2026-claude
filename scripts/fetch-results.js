@@ -63,7 +63,7 @@ function utcDate(offsetDays) {
 /* Devuelve los fixtures del Mundial para una fecha, o null si hay que
    omitir esta ejecución (límite de peticiones alcanzado). */
 async function fetchByDate(date) {
-  const res = await fetch(`${HOST}/fixtures?league=${LEAGUE}&date=${date}`, {
+   const res = await fetch(`${HOST}/fixtures?date=${date}`, {
     headers: { "x-apisports-key": API_KEY }
   });
   if (res.status === 429) { console.warn("⏳ Límite diario de peticiones alcanzado; se omite esta ejecución."); return null; }
