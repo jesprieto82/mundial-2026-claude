@@ -103,6 +103,7 @@ if (require.main === module) {
   run().catch(e => { console.error(e); process.exit(1); });
 }
 module.exports = { buildResults, run };
+
 function buildResults(fixtures) {
   const out = {};
   let mapped = 0, skipped = 0;
