@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0E1F1A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mundial 26">
+<title>Mundial 2026 · Guía completa</title>
+<meta name="description" content="Calendario completo del Mundial 2026: 104 partidos, horarios, dónde ver en México (gratis y de paga), opciones internacionales, resultados en vivo, grupos y eliminatorias.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app-shell">
+  <header class="topbar">
+    <div class="topbar-in">
+      <div class="brand">
+        <span class="brand-kicker">Copa del Mundo</span>
+        <h1 class="brand-title">MUNDIAL<span class="yr">26</span></h1>
+        <span class="brand-host">México · EE. UU. · Canadá</span>
+      </div>
+      <div class="topbar-right">
+        <button id="statusBadge" class="status-badge" title="Estado de los datos">
+          <span class="dot"></span><span id="statusText">Programación</span>
+        </button>
+        <button id="tzToggle" class="tz-toggle" title="Cambiar zona horaria">
+          <span id="tzLabel">Mi hora</span>
+        </button>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab is-active" data-view="hoy">Hoy</button>
+      <button class="tab" data-view="calendario">Calendario</button>
+      <button class="tab" data-view="grupos">Grupos</button>
+      <button class="tab" data-view="eliminatorias">Eliminatorias</button>
+      <button class="tab" data-view="donde">Dónde ver</button>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section id="view-hoy" class="view"></section>
+    <section id="view-calendario" class="view" hidden></section>
+    <section id="view-grupos" class="view" hidden></section>
+    <section id="view-eliminatorias" class="view" hidden></section>
+    <section id="view-donde" class="view" hidden></section>
+  </main>
+
+  <footer class="footer">
+    <p>Proyecto independiente de aficionado. No afiliado a la FIFA. Datos del sorteo del 5 de diciembre de 2025 y repescas de marzo de 2026. Los horarios se convierten automáticamente a tu dispositivo.</p>
+    <p class="footer-upd">Última carga de resultados: <span id="lastUpdate">—</span></p>
+  </footer>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
