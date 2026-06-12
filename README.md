@@ -96,8 +96,10 @@ La app lee un archivo **`results.json`** del propio repositorio cada minuto. Tú
 
 El repositorio ya incluye todo lo necesario para que los resultados se actualicen **solos** desde [API-Football](https://www.api-football.com/), sin que tú edites nada:
 
-- `scripts/fetch-results.js` — consulta la API (liga 1, temporada 2026), mapea cada partido a su número y escribe `results.json`.
+- `scripts/fetch-results.js` — consulta la API **por fecha** (ayer y hoy), filtra el Mundial (liga 1), mapea cada partido a su número y **acumula** los marcadores en `results.json`.
 - `.github/workflows/update-results.yml` — ejecuta ese script cada 30 minutos.
+
+> **Por qué por fecha y no por temporada:** el plan **Free** de API-Football no da acceso a la temporada 2026 (solo permite temporadas de hace 2–4 años), pero **sí permite consultar por fecha** (de ayer a mañana). El script usa esa vía, así que funciona en el plan gratuito sin pagar nada.
 
 ### 🔒 Seguridad: NUNCA pongas tu API key en el código
 
@@ -114,7 +116,8 @@ Con eso, `results.json` se actualiza solo y la app muestra marcadores, tablas y 
 
 ### Notas
 
-- **Cuota:** el plan gratuito de API-Football suele permitir ~100 peticiones/día. Cada ejecución usa 1–2 peticiones; a 30 min son ~48–96/día. Si ves errores de límite, cambia el `cron` a `"0 * * * *"` (cada hora) en el workflow.
+- **Cuota:** el plan gratuito permite ~100 peticiones/día. Cada ejecución usa 2 (ayer y hoy); a 30 min son ~96/día, dentro del límite. Si lo superas, el script **no falla**: omite esa vuelta y conserva lo ya guardado. Para más margen, cambia el `cron` a `"0 * * * *"` (cada hora) en el workflow.
+- **Acumulación:** el script no borra resultados anteriores; cada vuelta actualiza los partidos de ayer/hoy y mantiene los demás.
 - **Nombres de equipos:** el script reconoce los 48 países, pero si en el registro aparece algún “Sin mapear”, dime el nombre exacto que usa la API y lo añado.
 - **Eliminatorias:** el script ya maneja ganadores por penales para que el cuadro avance correctamente.
 - Si compartiste tu clave en algún lugar, **regenérala** en tu panel de API-Football y actualiza el secreto.
