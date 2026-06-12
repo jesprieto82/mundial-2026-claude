@@ -55,15 +55,20 @@ function mapStatus(short) {
   return null; // NS, TBD, PST, CANC... -> no empezado
 }
 
-/* Fecha UTC con desplazamiento de días, en formato YYYY-MM-DD. */
-function utcDate(offsetDays) {
-  return new Date(Date.now() + offsetDays * 86400000).toISOString().slice(0, 10);
+/* Cancún es UTC-5 todo el año (sin horario de verano). Calculamos la
+   fecha y la hora "de pared" de Cancún para alinear el día de partidos. */
+const CANCUN_OFFSET_MS = 5 * 3600 * 1000;
+function cancunDate(offsetDays) {
+  return new Date(Date.now() - CANCUN_OFFSET_MS + offsetDays * 86400000).toISOString().slice(0, 10);
+}
+function cancunHour() {
+  return new Date(Date.now() - CANCUN_OFFSET_MS).getUTCHours();
 }
 
 /* Devuelve los fixtures del Mundial para una fecha, o null si hay que
    omitir esta ejecución (límite de peticiones alcanzado). */
 async function fetchByDate(date) {
-  const res = await fetch(`${HOST}/fixtures?league=${LEAGUE}&date=${date}`, {
+  const res = await fetch(`${HOST}/fixtures?date=${date}&timezone=America%2FCancun`, {
     headers: { "x-apisports-key": API_KEY }
   });
   if (res.status === 429) { console.warn("⏳ Límite diario de peticiones alcanzado; se omite esta ejecución."); return null; }
@@ -84,9 +89,14 @@ async function run() {
   let merged = {};
   try { merged = JSON.parse(fs.readFileSync("results.json", "utf8")) || {}; } catch (e) { merged = {}; }
 
-  // Plan Free: solo se permiten fechas hoy-1 .. hoy+1. Pedimos hoy y ayer.
+  // Fechas en zona Cancún. "Hoy" siempre; "ayer" solo cuando conviene
+  // cerrar partidos tardíos: al inicio de la ventana (12h) y tras la medianoche.
+  const h = cancunHour();
+  const dates = [cancunDate(0)];
+  if (h < 2 || h === 12) dates.push(cancunDate(-1));
+
   const fixtures = [];
-  for (const d of [utcDate(0), utcDate(-1)]) {
+  for (const d of dates) {
     const list = await fetchByDate(d);
     if (list === null) { console.log("Se omite y se conserva lo ya guardado."); break; }
     console.log(`Fecha ${d}: ${list.length} partidos del Mundial.`);
