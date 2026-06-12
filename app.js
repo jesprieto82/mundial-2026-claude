@@ -47,14 +47,23 @@ let lastUpdate = null;
 function normalizeResults(raw){
   const out = {};
   if(!raw) return out;
-  if(Array.isArray(raw)){
-    raw.forEach(r => { if(r && r.n!=null) out[r.n]={h:num(r.h),a:num(r.a),status:r.status}; });
-  } else {
-    Object.keys(raw).forEach(k => { const r=raw[k]||{}; out[k]={h:num(r.h),a:num(r.a),status:r.status}; });
-  }
+  const put = (k,r) => { r=r||{}; out[k]={h:num(r.h),a:num(r.a),status:r.status,ht:r.ht||null,at:r.at||null,ph:num(r.ph),pa:num(r.pa)}; };
+  if(Array.isArray(raw)){ raw.forEach(r => { if(r && r.n!=null) put(r.n,r); }); }
+  else { Object.keys(raw).forEach(k => put(k,raw[k])); }
   return out;
 }
 function num(v){ return (v===""||v==null||isNaN(v))?null:Number(v); }
+
+/* Orienta el marcador a un equipo local dado (homeCode). Si el resultado trae
+   ht/at (códigos reales tal como los reportó la API), reordena h/a según quién
+   sea realmente el local en nuestra ficha; si no, los deja como están. */
+function scoreFor(r, homeCode){
+  if(r && r.ht && r.at && homeCode){
+    if(r.ht===homeCode) return {h:r.h, a:r.a};
+    if(r.at===homeCode) return {h:r.a, a:r.h};
+  }
+  return {h:r?r.h:null, a:r?r.a:null};
+}
 
 async function refreshResults(){
   let merged = {};
@@ -106,10 +115,11 @@ function computeStandings(letter){
   groupMatches(letter).forEach(m => {
     const r = RESULTS[m.n];
     if(!r || r.h==null || r.a==null) return;
+    const s = scoreFor(r, m.home);
     const H=rows[m.home], A=rows[m.away];
-    H.pj++; A.pj++; H.gf+=r.h; H.gc+=r.a; A.gf+=r.a; A.gc+=r.h;
-    if(r.h>r.a){ H.pg++; A.pp++; H.pts+=3; }
-    else if(r.h<r.a){ A.pg++; H.pp++; A.pts+=3; }
+    H.pj++; A.pj++; H.gf+=s.h; H.gc+=s.a; A.gf+=s.a; A.gc+=s.h;
+    if(s.h>s.a){ H.pg++; A.pp++; H.pts+=3; }
+    else if(s.h<s.a){ A.pg++; H.pp++; A.pts+=3; }
     else { H.pe++; A.pe++; H.pts++; A.pts++; }
   });
   const arr = Object.values(rows).map(x => ({...x, dif:x.gf-x.gc}));
@@ -141,7 +151,15 @@ function teamFromSlot(token){
   if(m){ const res=resolveKO(+m[2]); if(!res||!res.h||!res.a) return null; const r=RESULTS[m[2]];
     if(!r||r.h==null||r.a==null||r.status==="LIVE") { if(!(r&&r.status==="FT")) return null; }
     if(!r||r.h==null||r.a==null) return null;
-    const win = r.h>r.a?res.h : r.h<r.a?res.a : null; // empate sin definir
+    // Empate en tiempo reglamentario -> se decide por penales (ph/pa) si existen.
+    const byPen = (cH,cA) => (r.ph!=null&&r.pa!=null) ? (r.ph>r.pa?cH : r.pa>r.ph?cA : null) : null;
+    let win;
+    if(r.ht && r.at){            // marcador con códigos reales: no depende de la orientación de slots
+      win = r.h>r.a ? r.ht : r.a>r.h ? r.at : byPen(r.ht, r.at);
+      if(win!==res.h && win!==res.a) win = null;   // seguridad: debe ser uno de los resueltos
+    } else {                     // marcador h=local / a=visitante de nuestra ficha
+      win = r.h>r.a ? res.h : r.a>r.h ? res.a : byPen(res.h, res.a);
+    }
     if(win==null) return null;
     const lose = win===res.h?res.a:res.h;
     return m[1]==="G"?win:lose;
@@ -184,11 +202,12 @@ function matchCard(m){
   if(m.stage.length===1){ hc=m.home; ac=m.away; }
   else { const r=resolveKO(m.n); hc=r.h; ac=r.a; }
   const st = statusOf(m, {h:hc,a:ac});
+  const sc = scoreFor(RESULTS[m.n], hc);
   const live = st.state==="live";
   const ft = st.state==="ft";
-  const showScore = (st.h!=null && st.a!=null);
+  const showScore = (sc.h!=null && sc.a!=null);
 
-  const hWin = showScore && st.h>st.a, aWin = showScore && st.a>st.h;
+  const hWin = showScore && sc.h>sc.a, aWin = showScore && sc.a>sc.h;
 
   function side(code, token, isWin, isLose){
     const nm = code ? T(code) : slotLabel(token);
@@ -207,7 +226,7 @@ function matchCard(m){
   const isFav = (hc&&state.favs.has(hc))||(ac&&state.favs.has(ac));
 
   const side2 = showScore
-    ? `<div class="scorebox">${st.h}<span class="sc-sep">·</span>${st.a}</div>`
+    ? `<div class="scorebox">${sc.h}<span class="sc-sep">·</span>${sc.a}</div>`
     : `<div class="match-time">${fTime(m.utc)}<span class="ds">${fShortDate(m.utc)}</span></div>`;
 
   const footState = live?`<b style="color:var(--live)">En juego</b> · ` : ft&&showScore?`Finalizado · ` : "";
@@ -245,11 +264,12 @@ function renderHoy(){
   if(hero){
     const c = koCodes(hero);
     const st = statusOf(hero, c);
+    const hsc = scoreFor(RESULTS[hero.n], c.h);
     const nm = code => code?T(code):slotLabel(code===c.h?hero.home:hero.away);
     const hName = c.h?T(c.h):slotLabel(hero.home);
     const aName = c.a?T(c.a):slotLabel(hero.away);
-    const center = (st.h!=null&&st.a!=null)
-      ? `<div class="hero-score">${st.h} · ${st.a}</div>`
+    const center = (hsc.h!=null&&hsc.a!=null)
+      ? `<div class="hero-score">${hsc.h} · ${hsc.a}</div>`
       : `<div class="hero-vs">VS</div>`;
     heroHtml = `<div class="hero">
       <div class="hero-label">${st.state==="live"?"● En vivo ahora":"Próximo partido"}</div>
@@ -392,12 +412,13 @@ function renderEliminatorias(){
 }
 function koCard(m){
   const r=resolveKO(m.n);
+  const osc=scoreFor(RESULTS[m.n], r.h);
   const st=statusOf(m,{h:r.h,a:r.a});
-  const showScore=st.h!=null&&st.a!=null;
-  const hWin=showScore&&st.h>st.a, aWin=showScore&&st.a>st.h;
+  const showScore=osc.h!=null&&osc.a!=null;
+  const hWin=showScore&&osc.h>osc.a, aWin=showScore&&osc.a>osc.h;
   function side(code,token,win,lose){
     const nm=code?`${flagImg(code)}<span>${T(code)}</span>`:`<span>${slotLabel(token)}</span>`;
-    const sc = showScore?`<span class="ko-sc">${code===r.h?st.h:st.a}</span>`:"";
+    const sc = showScore?`<span class="ko-sc">${code===r.h?osc.h:osc.a}</span>`:"";
     return `<div class="ko-side ${code?'':'tbd'} ${win?'win':''} ${lose?'lose':''}">${nm}${sc}</div>`;
   }
   return `<div class="ko-match">

@@ -92,49 +92,32 @@ La app lee un archivo **`results.json`** del propio repositorio cada minuto. Tú
 
 ---
 
-## 3. (Opcional) Actualización automática sin que tú edites nada
+## 3. (Opcional) Actualización automática con API-Football
 
-Si tienes acceso a una fuente de datos (una API o un JSON que alguien actualice con los marcadores), puedes conectarla:
+El repositorio ya incluye todo lo necesario para que los resultados se actualicen **solos** desde [API-Football](https://www.api-football.com/), sin que tú edites nada:
 
-1. Abre `app.js` y, arriba, en `CONFIG`, pon la URL en `liveApiUrl`:
+- `scripts/fetch-results.js` — consulta la API (liga 1, temporada 2026), mapea cada partido a su número y escribe `results.json`.
+- `.github/workflows/update-results.yml` — ejecuta ese script cada 30 minutos.
 
-   ```js
-   const CONFIG = {
-     liveApiUrl: "https://tu-fuente.com/wc2026.json",
-     resultsFile: "results.json",
-     refreshSeconds: 60,
-   };
-   ```
+### 🔒 Seguridad: NUNCA pongas tu API key en el código
 
-2. Esa URL debe devolver el **mismo formato** que `results.json` (objeto por número de partido) y permitir lectura desde el navegador (CORS habilitado).
+Tu clave de API es secreta. **No la escribas en `app.js`, `data.js` ni en ningún archivo del repositorio**, porque tu sitio es público y cualquiera podría copiarla y agotar tu cuota. La forma correcta es guardarla como **secreto cifrado**, así nunca se publica.
 
-### Vía totalmente automática (GitHub Actions)
+### Pasos para activarla
 
-Si consigues una API de resultados, puedes programar una acción que escriba `results.json` sola cada cierto tiempo. Crea el archivo `.github/workflows/update.yml`:
+1. En tu repo, ve a **Settings → Secrets and variables → Actions → New repository secret**.
+2. **Name:** `API_FOOTBALL_KEY` — **Secret:** pega tu clave de API-Football. Guarda.
+3. Ve a la pestaña **Actions**, elige el flujo **“Actualizar resultados (API-Football)”** y pulsa **Run workflow** para una primera ejecución inmediata (luego corre solo cada 30 min).
+4. Abre la pestaña de esa ejecución para ver el registro: dirá cuántos partidos mapeó y si algún nombre de equipo no coincidió.
 
-```yaml
-name: Actualizar resultados
-on:
-  schedule:
-    - cron: "*/10 * * * *"   # cada 10 minutos
-  workflow_dispatch:
-jobs:
-  update:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Descargar marcadores
-        run: curl -s "https://tu-fuente.com/wc2026.json" -o results.json
-      - name: Commit
-        run: |
-          git config user.name "bot"
-          git config user.email "bot@users.noreply.github.com"
-          git add results.json
-          git commit -m "auto: resultados" || echo "sin cambios"
-          git push
-```
+Con eso, `results.json` se actualiza solo y la app muestra marcadores, tablas y cruces al día. El modo manual de la sección 2 sigue disponible como respaldo.
 
-Ajusta la URL de tu fuente y la frecuencia (`cron`). Mientras no la configures, la app funciona perfecto en modo manual (sección 2).
+### Notas
+
+- **Cuota:** el plan gratuito de API-Football suele permitir ~100 peticiones/día. Cada ejecución usa 1–2 peticiones; a 30 min son ~48–96/día. Si ves errores de límite, cambia el `cron` a `"0 * * * *"` (cada hora) en el workflow.
+- **Nombres de equipos:** el script reconoce los 48 países, pero si en el registro aparece algún “Sin mapear”, dime el nombre exacto que usa la API y lo añado.
+- **Eliminatorias:** el script ya maneja ganadores por penales para que el cuadro avance correctamente.
+- Si compartiste tu clave en algún lugar, **regenérala** en tu panel de API-Football y actualiza el secreto.
 
 ---
 
