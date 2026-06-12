@@ -76,6 +76,16 @@ img{max-width:100%}
   color:#EAF1EE;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:600;
   display:inline-flex;align-items:center;gap:7px;white-space:nowrap;min-height:34px;
 }
+.sync-btn{
+  border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#EAF1EE;
+  border-radius:999px;width:34px;height:34px;min-width:34px;flex:none;
+  display:inline-flex;align-items:center;justify-content:center;transition:transform .12s,color .2s,border-color .2s;
+}
+.sync-btn:active{transform:scale(.9)}
+@media(hover:hover){.sync-btn:hover{border-color:rgba(255,255,255,.32)}}
+.sync-btn.loading svg{animation:wc-spin .7s linear infinite}
+.sync-btn.done{color:var(--emerald);border-color:rgba(14,157,106,.55)}
+@keyframes wc-spin{to{transform:rotate(360deg)}}
 .tz-toggle{font-family:var(--mono);font-size:11px}
 .status-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--muted-2)}
 .status-badge.live .dot{background:var(--live);animation:pulse 1.4s infinite}
