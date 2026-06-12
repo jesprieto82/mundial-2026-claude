@@ -509,6 +509,23 @@ const tzLabel=document.getElementById("tzLabel");
 function paintTz(){ tzLabel.textContent = state.tz==="cdmx" ? "Hora CDMX" : "Mi hora"; }
 document.getElementById("tzToggle").onclick=()=>{ state.tz = state.tz==="cdmx"?"local":"cdmx"; save("wc26_tz",state.tz); paintTz(); renderCurrent(); };
 
+// botón de actualizar: recarga al instante el results.json más reciente
+const syncBtn = document.getElementById("syncBtn");
+if(syncBtn) syncBtn.onclick = async () => {
+  if(syncBtn.classList.contains("loading")) return;
+  syncBtn.classList.remove("done");
+  syncBtn.classList.add("loading");
+  const started = Date.now();
+  try{ await refreshResults(); }catch(e){}
+  // mantener el giro un instante mínimo para que se perciba
+  const wait = Math.max(0, 450 - (Date.now()-started));
+  setTimeout(()=>{
+    syncBtn.classList.remove("loading");
+    syncBtn.classList.add("done");
+    setTimeout(()=>syncBtn.classList.remove("done"), 1400);
+  }, wait);
+};
+
 // badge de estado
 function updateStatusBadge(){
   const live = WC.matches.some(m=>statusOf(m,koCodes(m)).state==="live");
