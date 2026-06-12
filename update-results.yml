@@ -2,8 +2,11 @@ name: Actualizar resultados (API-Football)
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # cada 30 minutos
-  workflow_dispatch:          # botón para ejecutarlo manualmente cuando quieras
+    # Ventana 12:00–01:00 de Cancún (UTC-5) = 17:00–06:00 UTC. Cada 10 minutos.
+    - cron: "*/10 17-23 * * *"   # 12:00–18:59 Cancún
+    - cron: "*/10 0-5 * * *"     # 19:00–00:59 Cancún
+    - cron: "0 6 * * *"          # 01:00 Cancún (cierre de la ventana)
+  workflow_dispatch:            # botón para ejecutarlo manualmente cuando quieras
 
 permissions:
   contents: write
